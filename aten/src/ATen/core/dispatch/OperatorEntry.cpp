@@ -222,7 +222,7 @@ std::pair<const AnnotatedKernel&, const char*> OperatorEntry::computeDispatchTab
   }
 
   // 2.1 Use DefaultBackend kernel if available.
-  if (isIncludedInAlias(dispatch_key, DispatchKey::DefaultBackend)) {
+  if (dispatch_key == DispatchKey::Undefined || isIncludedInAlias(dispatch_key, DispatchKey::DefaultBackend)) {
     if (auto default_backend_registration = getKernelForDispatchKey(DispatchKey::DefaultBackend)) {
       return {*default_backend_registration.value(), "default backend kernel"};
     }
@@ -234,7 +234,7 @@ std::pair<const AnnotatedKernel&, const char*> OperatorEntry::computeDispatchTab
   //      when there's no direct registration to its corresponding backend key or DefaultBackend.
   //      For AutogradOther, we return ambiguousAutogradOtherKernel_ if there's registration
   //      to any of its backends.
-  if (isIncludedInAlias(dispatch_key, DispatchKey::Math)) {
+  if (dispatch_key == DispatchKey::Undefined || isIncludedInAlias(dispatch_key, DispatchKey::Math)) {
     if (auto math_registration = getKernelForDispatchKey(DispatchKey::Math)) {
       if (dispatch_key == DispatchKey::AutogradOther
           && hasKernelForAnyDispatchKey(c10::autogradother_backends)) {
@@ -291,6 +291,7 @@ void OperatorEntry::updateDispatchTable_(const c10::Dispatcher& dispatcher, Disp
   }
   for (auto k : c10::getRuntimeDispatchKeySet(dispatch_key)) {
     updateDispatchTableEntry_(dispatcher, k);
+    updateDispatchTableEntry_(dispatcher, DispatchKey::Undefined);
   }
   // Note [Refresh Runtime Autograd entries in dispatchTable_]
   // Registering to backend key might affect computed entry at its Autograd backend key due to (2.1) & (2.3).
