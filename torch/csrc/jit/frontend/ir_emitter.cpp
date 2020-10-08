@@ -3136,6 +3136,16 @@ struct to_ir {
         return emitBuiltinCall(
             tree->range(), *method.graph(), kind, named_values, {});
       }
+      case '%': {
+        if (tree->tree(0)->kind() == TK_STRINGLITERAL) {
+          auto values = getValues(tree->trees(), /*maybe_unpack=*/false);
+          auto node = graph->create(aten::percentFormat, values, 1)
+                          ->setSourceRange(tree->range());
+          Value* output = graph->insertNode(node)->output();
+          output->setType(StringType::get());
+          return output;
+        }
+      }
       case TK_IN:
       case TK_POW:
       case TK_NE:
@@ -3148,7 +3158,6 @@ struct to_ir {
       case '/':
       case '+':
       case '-':
-      case '%':
       case '&':
       case '|':
       case '^':

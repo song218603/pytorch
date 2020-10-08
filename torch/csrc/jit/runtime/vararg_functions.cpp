@@ -39,6 +39,79 @@ void format(Stack& stack, size_t num_inputs) {
   push(stack, ss.str());
 }
 
+// IValue tags are intentionally private, so we need additional logic to cast
+// the IValue type to the specified format.
+std::string getFormattedArg(char key, const IValue& ival) {
+  std::stringstream ss;
+  bool added = false;
+  switch (key) {
+    case 'd':
+    case 'i': {
+      TORCH_CHECK(
+          ival.isScalar(),
+          "%",
+          key,
+          " format: A number is required, not ",
+          ival.tagKind());
+      if (ival.isDouble()) {
+        std::stringstream().swap(ss);
+        ss << static_cast<int>(ival.toDouble());
+        added = true;
+      }
+      break;
+    }
+    case 'f': {
+      TORCH_CHECK(
+          ival.isScalar(),
+          "%",
+          key,
+          " format: A number is required, not ",
+          ival.tagKind());
+      ss << std::setprecision(6) << std::fixed;
+      if (ival.isInt()) {
+        ss << static_cast<float>(ival.toInt());
+      } else {
+        ss << static_cast<float>(ival.toDouble());
+      }
+      added = true;
+      break;
+    }
+  }
+  if (!added) {
+    ss << ival;
+  }
+  return ss.str();
+}
+
+void percentFormat(Stack& stack, size_t num_inputs) {
+  // TODO: add support for more specifiers
+  std::vector<char> specifiers = {'d', 'i', 'f', 's'};
+  auto format = peek(stack, 0, num_inputs).toStringRef();
+  auto args = last(stack, num_inputs - 1);
+  std::stringstream ss;
+  for (size_t begin = 0, used_args = 0; true; ++used_args) {
+    size_t loc = format.find('%', begin);
+    if (loc >= format.length() - 1) {
+      ss << format.substr(begin);
+      break;
+    }
+    ss << format.substr(begin, loc - begin);
+    TORCH_CHECK(
+        used_args < args.size(),
+        "Too few arguments for format string: ",
+        format);
+    char key = format.at(loc + 1);
+    if (std::find(specifiers.begin(), specifiers.end(), key) !=
+        specifiers.end()) {
+      auto ins = getFormattedArg(key, args[used_args]);
+      ss << ins;
+      begin = loc + 2;
+    }
+  }
+  drop(stack, num_inputs);
+  push(stack, ss.str());
+}
+
 void listUnpack(Stack& stack, size_t num_outputs) {
   auto list = pop(stack).toList();
   TORCH_CHECK(
